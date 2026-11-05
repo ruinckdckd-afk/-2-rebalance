@@ -1,0 +1,400 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>正2 再平衡監控</title>
+<style>
+:root{--bg:#eef1f4;--card:#fff;--ink:#1d2b36;--mute:#5d6b76;--line:#dde3e8;--brand:#0f5a74;--up:#c0392b;--down:#1a7a4a;--warn:#fff4d6;--warnl:#e8cf8a}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 -apple-system,"Noto Sans TC","PingFang TC",sans-serif}
+.wrap{max-width:980px;margin:0 auto;padding:0 12px 40px}
+header{display:flex;justify-content:space-between;align-items:center;padding:14px 4px 6px;gap:8px;flex-wrap:wrap}
+h1{font-size:20px;margin:0}
+.chip{font-size:12px;border:1px solid var(--line);background:#fff;border-radius:99px;padding:3px 12px;white-space:nowrap}
+.chip i{display:inline-block;width:8px;height:8px;border-radius:50%;background:#999;margin-right:6px}
+.chip.ok i{background:#1a7a4a}.chip.err i{background:#c0392b}.chip.busy i{background:#e0a100}
+nav{display:flex;gap:2px;border-bottom:1px solid var(--line);overflow-x:auto;margin-bottom:12px}
+nav button{background:none;border:0;padding:10px 14px;font:inherit;color:var(--mute);cursor:pointer;border-bottom:3px solid transparent;white-space:nowrap;font-weight:600}
+nav button.on{color:var(--brand);border-color:var(--brand)}
+.card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:16px;margin-bottom:12px}
+.card h3{margin:0 0 4px;font-size:16px}
+.sub{color:var(--mute);font-size:13px;margin:0 0 10px}
+.grid{display:grid;gap:10px}
+.g2{grid-template-columns:repeat(auto-fit,minmax(200px,1fr))}
+.g3{grid-template-columns:repeat(auto-fit,minmax(160px,1fr))}
+label{display:block;font-size:12px;color:var(--mute);margin-bottom:3px}
+input,select,textarea{width:100%;padding:9px 10px;border:1px solid var(--line);border-radius:7px;font:inherit;background:#fff;color:var(--ink)}
+input[readonly]{background:#e7ecf1}
+textarea{font-family:ui-monospace,Menlo,monospace;font-size:12px;min-height:110px}
+button.b{background:var(--brand);color:#fff;border:0;border-radius:7px;padding:9px 18px;font:inherit;font-weight:700;cursor:pointer}
+button.o{background:#fff;color:var(--ink);border:1px solid var(--line);border-radius:7px;padding:7px 12px;font:inherit;font-weight:600;cursor:pointer}
+button.d{background:#fff;color:#b32d20;border:1px solid #e0a39c;border-radius:7px;padding:7px 12px;font:inherit;font-weight:600;cursor:pointer}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:7px;overflow:hidden}
+.seg button{border:0;background:#fff;padding:8px 22px;font:inherit;font-weight:700;cursor:pointer;color:var(--mute)}
+.seg button.on{background:var(--brand);color:#fff}
+.big{font:700 20px ui-monospace,Menlo,monospace}
+.up{color:var(--up)}.down{color:var(--down)}
+.banner{background:#f3e3da;border:1px solid #d9b9a4;border-radius:8px;padding:12px 14px;font-weight:700;margin-bottom:12px}
+.banner.warn{background:var(--warn);border-color:var(--warnl)}
+.note{background:#e8eefb;border-radius:8px;padding:10px 12px;margin:10px 0;font-size:14px}
+.note.pause{background:var(--warn)}
+.tag{display:inline-block;font-size:12px;font-weight:700;border-radius:99px;padding:2px 12px;border:1px solid}
+.tag.buy{color:#1d4fb8;border-color:#1d4fb8;background:#e8eefb}
+.tag.sell{color:#b32d20;border-color:#b32d20;background:#fdeceb}
+.tag.ok{color:var(--mute);border-color:var(--line)}
+.tag.paused{color:#9a6b00;border-color:#d8b04a;background:var(--warn)}
+.row{display:flex;justify-content:space-between;gap:10px;align-items:flex-start;flex-wrap:wrap}
+.gauge{position:relative;height:10px;background:#e1e7ec;border-radius:6px;margin:14px 0 6px}
+.gauge .band{position:absolute;top:0;bottom:0;background:#b7c9d6;border-left:2px solid #6b7f8c;border-right:2px solid #6b7f8c}
+.gauge .tg{position:absolute;top:-4px;bottom:-4px;width:2px;background:#111}
+.gauge .dot{position:absolute;top:-4px;width:16px;height:16px;margin-left:-8px;border-radius:50%;background:var(--brand);border:2px solid #fff;box-shadow:0 0 0 1px var(--brand)}
+table{width:100%;border-collapse:collapse;font-size:14px}
+th,td{padding:8px 8px;border-bottom:1px solid var(--line);text-align:right;white-space:nowrap}
+th:first-child,td:first-child{text-align:left}
+th{color:var(--mute);font-weight:600;font-size:13px}
+tr.next{background:#f3e8df}
+.tbl{overflow-x:auto}
+.mono{font-family:ui-monospace,Menlo,monospace}
+.tr{display:flex;gap:12px;align-items:center;padding:12px 0;border-bottom:1px solid var(--line);flex-wrap:wrap}
+.tr .info{flex:1;min-width:180px}
+.tr .meta{font-size:12px;color:var(--mute)}
+.bs{font-size:12px;font-weight:700;border:1px solid;border-radius:4px;padding:1px 6px}
+.bs.B{color:#1d4fb8;border-color:#1d4fb8}.bs.S{color:#b32d20;border-color:#b32d20}
+details summary{cursor:pointer;font-weight:700;color:var(--brand);margin:10px 0}
+.hint{font-size:13px;color:var(--mute)}
+hr{border:0;border-top:1px dashed var(--line);margin:14px 0}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header><h1>正2 再平衡監控</h1><span id="chip" class="chip"><i></i><span>本機模式</span></span></header>
+<nav id="nav">
+<button data-t="overview">總覽</button>
+<button data-t="lots">持股批次</button>
+<button data-t="record">記錄交易</button>
+<button data-t="history">交易紀錄</button>
+<button data-t="settings">設定</button>
+</nav>
+<main id="main"></main>
+</div>
+
+<script>
+/* ========== 資料 ========== */
+const LS_STATE='rebal_state_v1', LS_CONN='rebal_conn_v1';
+const defaultState=()=>({v:1,settings:{feeRate:0.1425,feeDiscount:2.3,minFee:1,taxRate:0.1,cashFloor:null,totalDDAlert:null,totalPeak:null},
+  instruments:[{code:'00631L',name:'元大台灣50正2',target:50,tol:5,risk:{peak:null,peakNote:'',pauseDD:null,pauseLoss:null,cutDD:null,cutTarget:null}}],
+  cash:0,trades:[],prices:{}});
+let S=loadLocal(); let conn=JSON.parse(localStorage.getItem(LS_CONN)||'{}'); let remoteSha=null;
+let tab='overview', editId=null, form=null, trial={};
+
+function loadLocal(){try{const s=JSON.parse(localStorage.getItem(LS_STATE));if(s&&s.v)return merge(s)}catch(e){}return defaultState()}
+function merge(s){const d=defaultState();s.settings={...d.settings,...(s.settings||{})};s.instruments=(s.instruments||d.instruments).map(i=>({...i,risk:{...d.instruments[0].risk,...(i.risk||{})}}));s.trades=s.trades||[];s.prices=s.prices||{};s.cash=s.cash||0;return s}
+
+/* ========== 工具 ========== */
+const $=s=>document.querySelector(s);
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const n0=n=>Math.round(n).toLocaleString('zh-TW');
+const n2=n=>Number(n).toFixed(2);
+const sgn=n=>(n>0?'+':n<0?'−':'')+Math.abs(Math.round(n)).toLocaleString('zh-TW');
+const pc=(v,d=1)=>(v>0?'+':v<0?'−':'')+Math.abs(v).toFixed(d)+'%';
+const cls=v=>v>0?'up':v<0?'down':'';
+const num=v=>(v===''||v==null||isNaN(Number(v)))?null:Number(v);
+const today=()=>new Date(Date.now()+8*3600e3).toISOString().slice(0,10);
+const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,6);
+const insOf=c=>S.instruments.find(i=>i.code===c);
+const feeOf=a=>{const s=S.settings;return Math.max(s.minFee,Math.floor(a*s.feeRate/100*s.feeDiscount/10))};
+const taxOf=a=>Math.floor(a*S.settings.taxRate/100);
+
+/* ========== FIFO 計算 ========== */
+function compute(){
+  const lots={},hold={},realizedBy={};let realized=0,warn=[];
+  S.instruments.forEach(i=>{lots[i.code]=[]});
+  const tr=[...S.trades].sort((a,b)=>a.date.localeCompare(b.date));
+  for(const t of tr){
+    const L=lots[t.code]||(lots[t.code]=[]);
+    if(t.type==='buy'){L.push({id:t.id,date:t.date,orig:t.shares,rem:t.shares,price:t.price,cost:t.price*t.shares+t.fee})}
+    else{let q=t.shares,cost=0;
+      while(q>0&&L.length){const l=L[0],take=Math.min(l.rem,q);cost+=l.cost*take/l.orig;l.rem-=take;q-=take;if(l.rem===0)L.shift()}
+      if(q>0)warn.push(`${t.date} ${t.code} 賣出超過持股 ${q} 股`);
+      const matched=t.shares-q,pnl=t.price*matched-t.fee-t.tax-cost;realizedBy[t.id]=pnl;realized+=pnl}
+  }
+  for(const c in lots){const L=lots[c];hold[c]={shares:L.reduce((s,l)=>s+l.rem,0),cost:L.reduce((s,l)=>s+l.cost*l.rem/l.orig,0)}}
+  return{lots,hold,realizedBy,realized,warn};
+}
+function simSell(C,code,qty,price){
+  const L=(C.lots[code]||[]).map(l=>({...l}));let q=qty,cost=0;
+  for(const l of L){if(q<=0)break;const take=Math.min(l.rem,q);cost+=l.cost*take/l.orig;q-=take}
+  const amt=price*qty,fee=feeOf(amt),tax=taxOf(amt);
+  return{amt,fee,tax,cost,pnl:amt-fee-tax-cost,short:q>0};
+}
+const priceOf=c=>S.prices[c]?.price||0;
+
+function analyze(C,total){
+  const out={};
+  S.instruments.forEach(ins=>{
+    const h=C.hold[ins.code]||{shares:0,cost:0},p=priceOf(ins.code),mv=h.shares*p,pct=total?mv/total*100:0,r=ins.risk;
+    const dd=r.peak&&p?(1-p/r.peak)*100:null,upct=h.cost?(mv-h.cost)/h.cost*100:null;
+    let target=ins.target,cut=false,pause=false,why=[];
+    if(r.cutDD!=null&&r.cutTarget!=null&&dd!=null&&dd>=r.cutDD){target=Math.min(target,r.cutTarget);cut=true}
+    if(r.pauseDD!=null&&dd!=null&&dd>=r.pauseDD){pause=true;why.push(`離前高回檔 ${dd.toFixed(1)}% ≥ ${r.pauseDD}%`)}
+    if(r.pauseLoss!=null&&upct!=null&&upct<=-r.pauseLoss){pause=true;why.push(`相對成本虧損 ${Math.abs(upct).toFixed(1)}% ≥ ${r.pauseLoss}%`)}
+    const fl=S.settings.cashFloor;if(fl!=null&&S.cash<=fl){pause=true;why.push(`現金已低於下限 ${n0(fl)}`)}
+    let status='ok';
+    if(pct<target-ins.tol)status='buy';else if(pct>target+ins.tol)status='sell';
+    if(status==='buy'&&pause)status='paused';
+    let qty=0;
+    if(p&&(status==='buy'||status==='paused')){qty=Math.round((target/100*total-mv)/p);const k=1+S.settings.feeRate/100*S.settings.feeDiscount/10;
+      qty=Math.min(qty,Math.floor(S.cash/(p*k)));qty=Math.max(qty,0)}
+    if(p&&status==='sell'){qty=Math.min(Math.round((mv-target/100*total)/p),h.shares);qty=Math.max(qty,0)}
+    out[ins.code]={ins,h,p,mv,pct,dd,upct,target,cut,pause,why,status,qty};
+  });
+  return out;
+}
+
+/* ========== 儲存／同步 ========== */
+let saveT=null,chipState='local';
+function setChip(st,txt){chipState=st;const c=$('#chip');c.className='chip '+(st==='ok'?'ok':st==='err'?'err':st==='busy'?'busy':'');c.querySelector('span').textContent=txt}
+function persist(){localStorage.setItem(LS_STATE,JSON.stringify(S));if(conn.token&&conn.repo){setChip('busy','儲存中…');clearTimeout(saveT);saveT=setTimeout(pushRemote,700)}}
+const api=(path,opt={})=>fetch(`https://api.github.com/repos/${conn.repo}/contents/${path}`,{cache:'no-store',...opt,headers:{Authorization:'Bearer '+conn.token,Accept:'application/vnd.github+json','X-GitHub-Api-Version':'2022-11-28',...(opt.headers||{})}});
+const b64e=s=>{const b=new TextEncoder().encode(s);let r='';for(let i=0;i<b.length;i+=8192)r+=String.fromCharCode(...b.subarray(i,i+8192));return btoa(r)};
+const b64d=s=>new TextDecoder().decode(Uint8Array.from(atob(s.replace(/\n/g,'')),c=>c.charCodeAt(0)));
+async function pushRemote(){
+  try{
+    const body={message:'update data '+new Date().toISOString(),content:b64e(JSON.stringify(S,null,1))};if(remoteSha)body.sha=remoteSha;
+    const r=await api('data.json',{method:'PUT',body:JSON.stringify(body)});
+    if(r.status===409||r.status===422){setChip('err','雲端有較新資料，請重新整理');return}
+    if(!r.ok)throw new Error(r.status);
+    remoteSha=(await r.json()).content.sha;setChip('ok','雲端・已同步');
+  }catch(e){setChip('err','同步失敗：'+e.message)}
+}
+async function pullRemote(){
+  if(!(conn.token&&conn.repo)){setChip('local','本機模式');return}
+  setChip('busy','連線中…');
+  try{
+    const r=await api('data.json');
+    if(r.status===404){remoteSha=null;await pushRemote()}
+    else if(!r.ok)throw new Error(r.status===401?'Token 無效':r.status);
+    else{const j=await r.json();remoteSha=j.sha;S=merge(JSON.parse(b64d(j.content)));localStorage.setItem(LS_STATE,JSON.stringify(S));setChip('ok','雲端・已同步')}
+    const pr=await api('prices.json');
+    if(pr.ok){const pj=JSON.parse(b64d((await pr.json()).content));
+      for(const c in (pj.prices||{})){const n=pj.prices[c],o=S.prices[c];
+        if(!o||n.date>o.date||(n.date===o.date&&o.src!=='manual'))S.prices[c]={price:n.price,date:n.date,src:'auto'}}
+      localStorage.setItem(LS_STATE,JSON.stringify(S))}
+  }catch(e){setChip('err','連線失敗：'+e.message)}
+  render();
+}
+
+/* ========== 頁籤 ========== */
+document.querySelectorAll('#nav button').forEach(b=>b.onclick=()=>go(b.dataset.t));
+function go(t){tab=t;render();window.scrollTo(0,0)}
+function render(){
+  document.querySelectorAll('#nav button').forEach(b=>b.classList.toggle('on',b.dataset.t===tab));
+  const C=compute();
+  const total=S.cash+S.instruments.reduce((s,i)=>s+(C.hold[i.code]?.shares||0)*priceOf(i.code),0);
+  if(total>0&&(S.settings.totalPeak==null||total>S.settings.totalPeak)){S.settings.totalPeak=Math.round(total);persist()}
+  const A=analyze(C,total);
+  $('#main').innerHTML=({overview:vOverview,lots:vLots,record:vRecord,history:vHistory,settings:vSettings}[tab])(C,total,A);
+  bind(C,total,A);
+}
+
+/* ========== 總覽 ========== */
+function vOverview(C,total,A){
+  const unreal=S.instruments.reduce((s,i)=>{const a=A[i.code];return s+a.mv-a.h.cost},0);
+  const cost=S.instruments.reduce((s,i)=>s+A[i.code].h.cost,0);
+  const flagged=S.instruments.filter(i=>['buy','sell','paused'].includes(A[i.code].status));
+  const st=S.settings,pk=st.totalPeak,tdd=pk&&total?(1-total/pk)*100:0;
+  let h='';
+  if(flagged.length)h+=`<div class="banner">有 ${flagged.length} 檔超出區間：${flagged.map(i=>i.code+({buy:' 建議買進',sell:' 建議賣出',paused:' 已暫停加碼'})[A[i.code].status]).join('、')}</div>`;
+  if(st.totalDDAlert!=null&&tdd>=st.totalDDAlert)h+=`<div class="banner warn">總資產離前高回檔 ${tdd.toFixed(1)}%，已達警示線 ${st.totalDDAlert}%</div>`;
+  C.warn.forEach(w=>h+=`<div class="banner warn">${esc(w)}</div>`);
+  h+=`<div class="grid g3" style="margin-bottom:12px">
+   <div class="card" style="margin:0"><div class="hint">總資產</div><div class="big">NT$ ${n0(total)}</div></div>
+   <div class="card" style="margin:0"><div class="hint">未實現損益</div><div class="big ${cls(unreal)}">${sgn(unreal)}</div><div class="hint">損益比 ${cost?pc(unreal/cost*100,2):'—'}</div></div>
+   <div class="card" style="margin:0"><div class="hint">累計已實現（FIFO）</div><div class="big ${cls(C.realized)}">${sgn(C.realized)}</div></div></div>`;
+  S.instruments.forEach(ins=>{
+    const a=A[ins.code],p=a.p,u=a.mv-a.h.cost,sell=a.h.shares&&p?simSell(C,ins.code,a.h.shares,p):null;
+    const lo=a.target-ins.tol,hi=a.target+ins.tol;
+    const tagTxt={buy:'建議買進',sell:'建議賣出',ok:'在區間內',paused:'暫停加碼'}[a.status];
+    h+=`<div class="card"><div class="row"><div><h3>${esc(ins.name)}</h3><div class="hint mono">${esc(ins.code)}</div></div><span class="tag ${a.status}">${tagTxt}</span></div>
+    <div class="grid g3" style="margin-top:10px">
+     <div><label>現價（可手動修改）</label><input type="number" step="0.01" data-price="${esc(ins.code)}" value="${p||''}"><div class="hint">${S.prices[ins.code]?`更新於 ${S.prices[ins.code].date}${S.prices[ins.code].src==='auto'?'（自動）':'（手動）'}`:'尚無價格'}</div></div>
+     <div><div class="hint">持股</div><div class="big">${n0(a.h.shares)} 股</div></div>
+     <div><div class="hint">市值</div><div class="big">NT$ ${n0(a.mv)}</div></div>
+     <div><div class="hint">未實現損益</div><div class="big ${cls(u)}">${sgn(u)}</div><div class="hint ${cls(u)}">損益比 ${a.h.cost?pc(u/a.h.cost*100,2):'—'}</div>${sell?`<div class="hint">若現在賣出，費稅 NT$ ${n0(sell.fee+sell.tax)}，扣後 <span class="${cls(sell.pnl)}">${sgn(sell.pnl)}</span></div>`:''}</div></div>
+    <div class="gauge"><div class="band" style="left:${Math.max(lo,0)}%;width:${Math.min(hi,100)-Math.max(lo,0)}%"></div><div class="tg" style="left:${a.target}%"></div><div class="dot" style="left:${Math.min(Math.max(a.pct,0),100)}%"></div></div>
+    <div class="hint">目前 <b>${a.pct.toFixed(1)}%</b>　目標 ${a.target}% ± ${ins.tol}${a.cut?'（已減碼目標）':''}　${a.dd!=null?`離前高 ${a.dd.toFixed(1)}%（前高 ${ins.risk.peak}）`:'未設定前高'}</div>`;
+    if(a.status==='buy'||a.status==='paused'){
+      h+=`<div class="note">比目標低 ${(a.target-a.pct).toFixed(1)} 個百分點。買進約 <b>${n0(a.qty)}</b> 股（約 NT$ ${n0(a.qty*p)}）可回到目標。</div>`;
+      if(a.pause)h+=`<div class="note pause"><b>風險防線：暫停加碼</b><br>${a.why.map(esc).join('<br>')}</div>`;
+    }else if(a.status==='sell'){
+      const s=simSell(C,ins.code,a.qty,p),nx=(C.lots[ins.code]||[])[0];
+      h+=`<div class="note">比目標高 ${(a.pct-a.target).toFixed(1)} 個百分點。賣出約 <b>${n0(a.qty)}</b> 股（約 NT$ ${n0(a.qty*p)}）可回到目標。<br>依 FIFO 會先賣 ${nx?nx.date+' 那批':'—'}，預估賺賠（扣費稅）<b class="${cls(s.pnl)}">${sgn(s.pnl)}</b>。</div>`}
+    const t=trial[ins.code];
+    h+=`<details ${t?'open':''}><summary>${t?'收起試算':'展開試算'}</summary>
+     <div class="seg" data-trialside="${esc(ins.code)}"><button data-s="sell" class="${t?.side!=='buy'?'on':''}">試算賣出</button><button data-s="buy" class="${t?.side==='buy'?'on':''}">試算買進</button></div>
+     <div class="grid g3" style="margin-top:10px"><div><label>股數</label><input type="number" data-trialqty="${esc(ins.code)}" value="${t?.qty??''}"></div></div>
+     <div id="tr_${esc(ins.code)}" style="margin-top:8px"></div></details></div>`;
+  });
+  const cp=total?S.cash/total*100:0,ct=100-S.instruments.reduce((s,i)=>s+i.target,0);
+  h+=`<div class="card"><h3>現金（防守部位）</h3><p class="sub">目標 ${ct}%（100% 減去各標的的目標）</p>
+   <div class="grid g2"><div><label>現金餘額</label><input type="number" id="cash" value="${S.cash}"></div><div><div class="hint">目前比例</div><div class="big">${cp.toFixed(1)}%</div></div></div>
+   <div class="gauge"><div class="tg" style="left:${ct}%"></div><div class="dot" style="left:${Math.min(cp,100)}%"></div></div>
+   <div class="hint">記錄交易時若勾選「同步現金」，餘額會自動增減。</div></div>
+   <p class="hint">未實現損益＝市值−含買進手續費的成本（與國泰 App 相同，不含賣出費稅）；已實現損益才會扣賣出費稅。紅色代表賺、綠色代表賠（台股慣例）。</p>`;
+  return h;
+}
+function trialHTML(C,A,code){
+  const t=trial[code];if(!t||!t.qty)return'<div class="hint">輸入股數後，這裡會顯示結果。</div>';
+  const a=A[code],p=a.p,q=Number(t.qty),amt=p*q;
+  if(t.side==='buy'){const f=feeOf(amt);return`<div class="grid g3"><div><div class="hint">預估成本</div><b>NT$ ${n0(amt)}</b></div><div><div class="hint">手續費</div><b>NT$ ${n0(f)}</b></div><div><div class="hint">買後現金</div><b>NT$ ${n0(S.cash-amt-f)}</b></div></div>
+   <p class="hint">買進後持股 ${n0(a.h.shares+q)} 股。這批會排在 FIFO 佇列最後面。</p>
+   <button class="b" data-torec="buy" data-code="${esc(code)}">依此記錄交易</button>`}
+  const s=simSell(C,code,q,p);
+  return`<div class="grid g3"><div><div class="hint">預估收入</div><b>NT$ ${n0(s.amt)}</b></div><div><div class="hint">手續費＋證交稅</div><b>NT$ ${n0(s.fee+s.tax)}</b></div><div><div class="hint">FIFO 成本</div><b>NT$ ${n0(s.cost)}</b></div><div><div class="hint">預估賺賠</div><b class="${cls(s.pnl)}">${sgn(s.pnl)}</b></div></div>
+   ${s.short?'<p class="hint up">股數超過目前持股。</p>':''}<p class="hint">賣出會依 FIFO 先賣最舊的批次（國泰 App 無法指定批次）。</p>
+   <button class="b" data-torec="sell" data-code="${esc(code)}">依此記錄交易</button>`;
+}
+
+/* ========== 持股批次 ========== */
+function vLots(C){
+  let h=`<div class="banner warn"><b>FIFO 順序：</b>每檔標的由上往下，最上面那批會最先被賣掉。國泰證券 App 不能指定批次。</div>`;
+  S.instruments.forEach(ins=>{
+    const L=C.lots[ins.code]||[],hd=C.hold[ins.code],p=priceOf(ins.code);
+    h+=`<div class="card"><div class="row"><div><h3>${esc(ins.name)}</h3><div class="hint mono">${esc(ins.code)}</div></div><div style="text-align:right"><div class="hint">持股 / 含費均價</div><div class="big">${n0(hd.shares)} 股 / ${hd.shares?n2(hd.cost/hd.shares):'—'}</div></div></div>
+    <div class="tbl"><table><tr><th>賣出順位</th><th>買進日</th><th>剩餘股數</th><th>買價</th><th>含費成本/股</th><th>未實現損益</th></tr>`;
+    L.forEach((l,i)=>{const cps=l.cost/l.orig,u=(p-cps)*l.rem;
+      h+=`<tr class="${i===0?'next':''}"><td>${i+1} ${i===0?'<span class="tag sell" style="font-size:11px;padding:0 8px">下一批賣出</span>':''}</td><td class="mono">${l.date}</td><td class="mono">${n0(l.rem)}</td><td class="mono">${n2(l.price)}</td><td class="mono">${n2(cps)}</td><td class="mono ${cls(u)}">${p?sgn(u):'—'}</td></tr>`});
+    if(!L.length)h+='<tr><td colspan="6" class="hint">目前沒有持股</td></tr>';
+    h+='</table></div></div>';
+  });
+  return h;
+}
+
+/* ========== 記錄交易（第一頁） ========== */
+function vRecord(){
+  const f=form||(form={type:'buy',date:today(),code:S.instruments[0].code,shares:'',price:priceOf(S.instruments[0].code)||'',fee:'',sync:true});
+  return`<div class="card"><h3>${editId?'編輯交易':'記錄交易'}</h3>
+   <div class="seg" id="side" style="margin:8px 0 12px"><button data-s="buy" class="${f.type==='buy'?'on':''}">買進</button><button data-s="sell" class="${f.type==='sell'?'on':''}">賣出</button></div>
+   <div class="grid g2">
+    <div><label>日期</label><input type="date" id="f_date" value="${f.date}"></div>
+    <div><label>標的</label><select id="f_code">${S.instruments.map(i=>`<option value="${esc(i.code)}" ${i.code===f.code?'selected':''}>${esc(i.code)} ${esc(i.name)}</option>`).join('')}</select></div>
+    <div><label>股數（零股也可以）</label><input type="number" id="f_shares" value="${f.shares}"></div>
+    <div><label>成交單價</label><input type="number" step="0.01" id="f_price" value="${f.price}"></div>
+    <div><label>手續費（可改，留空自動計算）</label><input type="number" id="f_fee" value="${f.fee}"></div></div>
+   <label style="margin-top:12px;display:flex;gap:8px;align-items:center;font-size:14px;color:var(--ink)"><input type="checkbox" id="f_sync" style="width:auto" ${f.sync?'checked':''}>同步現金（買進扣款、賣出入帳）</label>
+   <div id="f_prev" class="hint" style="margin:10px 0"></div>
+   <div style="display:flex;gap:8px;justify-content:flex-end">${editId?'<button class="o" id="f_cancel">取消編輯</button>':''}<button class="b" id="f_save">${editId?'儲存修改':'記錄'}</button></div></div>
+   <p class="hint">已記錄的交易請到「交易紀錄」頁查看、編輯或刪除。</p>`;
+}
+function formPrev(){
+  const f=form,q=num(f.shares),p=num(f.price),el=$('#f_prev');if(!el)return;
+  if(!q||!p){el.textContent='輸入股數與單價後，這裡會顯示結果。';return}
+  const amt=q*p,fee=num(f.fee)??feeOf(amt);
+  if(f.type==='buy')el.innerHTML=`成交金額 NT$ ${n0(amt)}，手續費 ${n0(fee)}，合計 <b>NT$ ${n0(amt+fee)}</b>`;
+  else{const tax=taxOf(amt),C=compute(),s=simSell(C,f.code,q,p);el.innerHTML=`成交金額 NT$ ${n0(amt)}，手續費 ${n0(fee)}，證交稅 ${n0(tax)}，入帳 <b>NT$ ${n0(amt-fee-tax)}</b>；依 FIFO 預估賺賠 <b class="${cls(s.pnl)}">${sgn(s.pnl+s.fee-fee)}</b>`}
+}
+function cashDelta(t){return t.type==='buy'?-(t.price*t.shares+t.fee):(t.price*t.shares-t.fee-t.tax)}
+
+/* ========== 交易紀錄（第二頁） ========== */
+function vHistory(C){
+  const L=[...S.trades].sort((a,b)=>b.date.localeCompare(a.date));
+  let h=`<div class="card"><div class="row"><h3>交易紀錄（${L.length} 筆）</h3><div>累計已實現 <b class="mono ${cls(C.realized)}">${sgn(C.realized)}</b></div></div>`;
+  L.forEach(t=>{
+    h+=`<div class="tr"><div class="info"><b>${esc(t.code)}</b> <span class="mono">${n0(t.shares)} 股 @ ${n2(t.price)}</span> <span class="bs ${t.type==='buy'?'B':'S'}">${t.type==='buy'?'買':'賣'}</span>
+     <div class="meta">${t.date} ・ 費用 NT$ ${n0(t.fee+(t.tax||0))}${t.syncCash?' ・ 已同步現金':''}${t.type==='sell'?` ・ 已實現 <span class="${cls(C.realizedBy[t.id])}">${sgn(C.realizedBy[t.id]||0)}</span>`:''}</div></div>
+     <button class="o" data-edit="${t.id}">編輯</button><button class="d" data-del="${t.id}">刪除</button></div>`});
+  if(!L.length)h+='<p class="hint">還沒有交易紀錄。</p>';
+  return h+'</div>';
+}
+
+/* ========== 設定 ========== */
+function vSettings(){
+  const st=S.settings,v=x=>x==null?'':x;
+  let h=`<div class="card"><h3>標的與目標比例</h3><p class="sub">每檔填目標比例與容許偏離（百分點）。現金目標＝100% 減去各標的目標，現在是 ${100-S.instruments.reduce((s,i)=>s+i.target,0)}%。</p>`;
+  S.instruments.forEach((i,k)=>{const r=i.risk,has=S.trades.some(t=>t.code===i.code);
+    h+=`<div class="grid g3" data-ins="${k}"><div><label>代號</label><input value="${esc(i.code)}" readonly></div><div><label>名稱</label><input data-f="name" value="${esc(i.name)}"></div><div><label>目標 %</label><input type="number" data-f="target" value="${i.target}"></div><div><label>容許 ± 百分點</label><input type="number" data-f="tol" value="${i.tol}"></div>
+    <div style="align-self:end">${has?'<span class="hint">有交易紀錄，不能刪除</span>':`<button class="d" data-rm="${k}">刪除標的</button>`}</div></div>
+    <details><summary>${esc(i.code)} 風險防線（暫停加碼、減碼）</summary><div class="grid g3">
+     <div><label>前高價（自己填）</label><input type="number" step="0.01" data-r="peak" value="${v(r.peak)}"></div>
+     <div><label>前高期間說明</label><input data-r="peakNote" placeholder="例如 近6個月" value="${esc(r.peakNote)}"></div>
+     <div><label>暫停加碼：離前高回檔 ≥ %</label><input type="number" data-r="pauseDD" placeholder="關閉" value="${v(r.pauseDD)}"></div>
+     <div><label>暫停加碼：相對成本虧損 ≥ %</label><input type="number" data-r="pauseLoss" placeholder="關閉" value="${v(r.pauseLoss)}"></div>
+     <div><label>減碼：離前高回檔 ≥ %（選填）</label><input type="number" data-r="cutDD" placeholder="關閉" value="${v(r.cutDD)}"></div>
+     <div><label>減碼後的目標 %</label><input type="number" data-r="cutTarget" placeholder="關閉" value="${v(r.cutTarget)}"></div></div></details><hr>`});
+  h+=`<h3>新增標的</h3><div class="grid g3"><div><label>代號</label><input id="n_code" placeholder="00675L"></div><div><label>名稱</label><input id="n_name" placeholder="富邦臺灣加權正2"></div><div><label>目標 %</label><input type="number" id="n_t" value="20"></div><div><label>容許 ±</label><input type="number" id="n_tol" value="5"></div><div style="align-self:end"><button class="b" id="n_add">新增</button></div></div></div>
+  <div class="card"><h3>整體防線</h3><p class="sub">這些只會改變提示，不會自動下單。留空代表關閉。</p><div class="grid g3">
+   <div><label>現金下限（元）：低於這個金額就不再建議買進</label><input type="number" data-s="cashFloor" placeholder="關閉" value="${v(st.cashFloor)}"></div>
+   <div><label>總資產回檔警示 ≥ %</label><input type="number" data-s="totalDDAlert" placeholder="關閉" value="${v(st.totalDDAlert)}"></div>
+   <div><label>總資產前高（更新價格時自動記錄，可自行修改）</label><input type="number" data-s="totalPeak" value="${v(st.totalPeak)}"></div></div>
+   <p><button class="o" id="peakReset">把前高重設為目前總資產</button></p></div>
+  <div class="card"><h3>費用設定</h3><p class="sub">請依你在國泰證券實際的折扣與最低手續費調整。每筆交易也能單獨修改。</p><div class="grid g3">
+   <div><label>手續費率 %</label><input type="number" step="0.0001" data-s="feeRate" value="${st.feeRate}"></div>
+   <div><label>手續費折扣（2.3 代表 2.3 折；10＝不打折）</label><input type="number" step="0.1" data-s="feeDiscount" value="${st.feeDiscount}"></div>
+   <div><label>最低手續費（元）</label><input type="number" data-s="minFee" value="${st.minFee}"></div>
+   <div><label>證交稅率 %（賣出）</label><input type="number" step="0.01" data-s="taxRate" value="${st.taxRate}"></div></div></div>
+  <div class="card"><h3>GitHub 雲端同步</h3><p class="sub">資料存在你自己的私人 repo（data.json），Actions 會把自動抓到的價格寫進 prices.json。Token 只存在這台裝置的瀏覽器。</p><div class="grid g3">
+   <div><label>私人 repo（帳號/repo 名稱）</label><input id="c_repo" placeholder="yourname/rebalance-data" value="${esc(conn.repo||'')}"></div>
+   <div><label>Fine-grained Token（該 repo 的 Contents 讀寫）</label><input id="c_token" type="password" value="${esc(conn.token||'')}"></div>
+   <div style="align-self:end;display:flex;gap:8px"><button class="b" id="c_save">連線</button><button class="o" id="c_off">中斷</button></div></div></div>
+  <div class="card"><h3>備份與還原</h3><label>匯出（複製整段文字存起來）</label><textarea id="exp" readonly>${esc(JSON.stringify(S,null,1))}</textarea><p><button class="o" id="exp_copy">複製</button></p>
+   <label>匯入（貼上先前的備份，會取代目前資料）</label><textarea id="imp"></textarea><p><button class="d" id="imp_go">匯入並取代</button></p></div>`;
+  return h;
+}
+
+/* ========== 事件 ========== */
+function bind(C,total,A){
+  const m=$('#main');
+  m.querySelectorAll('[data-price]').forEach(e=>e.onchange=()=>{const v=num(e.value);if(v!=null){S.prices[e.dataset.price]={price:v,date:today(),src:'manual'};persist();render()}});
+  const cash=$('#cash');if(cash)cash.onchange=()=>{S.cash=num(cash.value)||0;persist();render()};
+  m.querySelectorAll('[data-trialside]').forEach(g=>g.querySelectorAll('button').forEach(b=>b.onclick=()=>{const c=g.dataset.trialside;trial[c]={...(trial[c]||{}),side:b.dataset.s};render()}));
+  m.querySelectorAll('[data-trialqty]').forEach(e=>{const c=e.dataset.trialqty;
+    const upd=()=>{const box=$('#tr_'+CSS.escape(c));if(box){box.innerHTML=trialHTML(C,A,c);box.querySelectorAll('[data-torec]').forEach(b=>b.onclick=()=>toRecord(b.dataset.code,b.dataset.torec,trial[c].qty,priceOf(c)))}};
+    e.oninput=()=>{trial[c]={side:'sell',...(trial[c]||{}),qty:e.value};upd()};upd()});
+  m.querySelectorAll('summary').forEach(s=>s.onclick=()=>{});
+  if(tab==='record')bindRecord();
+  if(tab==='history'){
+    m.querySelectorAll('[data-edit]').forEach(b=>b.onclick=()=>{const t=S.trades.find(x=>x.id===b.dataset.edit);editId=t.id;form={type:t.type,date:t.date,code:t.code,shares:t.shares,price:t.price,fee:t.fee,sync:!!t.syncCash};go('record')});
+    m.querySelectorAll('[data-del]').forEach(b=>b.onclick=()=>{if(!confirm('確定刪除這筆交易？（已同步的現金會一併還原）'))return;const t=S.trades.find(x=>x.id===b.dataset.del);if(t.syncCash)S.cash-=cashDelta(t);S.trades=S.trades.filter(x=>x!==t);persist();render()});
+  }
+  if(tab==='settings')bindSettings();
+}
+function toRecord(code,type,qty,price){editId=null;form={type,date:today(),code,shares:qty,price:price||'',fee:'',sync:true};go('record')}
+function bindRecord(){
+  const f=form;
+  const rd=()=>{f.date=$('#f_date').value;f.code=$('#f_code').value;f.shares=$('#f_shares').value;f.price=$('#f_price').value;f.fee=$('#f_fee').value;f.sync=$('#f_sync').checked;formPrev()};
+  ['f_date','f_code','f_shares','f_price','f_fee','f_sync'].forEach(id=>$('#'+id).oninput=rd);
+  $('#f_code').onchange=()=>{rd();if(!editId){f.price=priceOf(f.code)||'';$('#f_price').value=f.price;formPrev()}};
+  $('#side').querySelectorAll('button').forEach(b=>b.onclick=()=>{rd();f.type=b.dataset.s;render()});
+  const c=$('#f_cancel');if(c)c.onclick=()=>{editId=null;form=null;go('history')};
+  $('#f_save').onclick=()=>{
+    rd();const q=num(f.shares),p=num(f.price);if(!q||q<=0||!p||p<=0){alert('請填股數與成交單價');return}
+    const amt=q*p,t={id:editId||uid(),date:f.date,type:f.type,code:f.code,shares:q,price:p,fee:num(f.fee)??feeOf(amt),tax:f.type==='sell'?taxOf(amt):0,syncCash:f.sync};
+    if(editId){const o=S.trades.find(x=>x.id===editId);if(o.syncCash)S.cash-=cashDelta(o);Object.assign(o,t)}else S.trades.push(t);
+    if(t.syncCash)S.cash+=cashDelta(t);
+    const was=editId;editId=null;form=null;persist();go(was?'history':'history');
+  };
+  formPrev();
+}
+function bindSettings(){
+  const m=$('#main');
+  m.querySelectorAll('[data-ins]').forEach(box=>{const i=S.instruments[box.dataset.ins];
+    box.querySelectorAll('[data-f]').forEach(e=>e.onchange=()=>{const k=e.dataset.f;i[k]=k==='name'?e.value:(num(e.value)??0);persist();render()});
+    let d=box.nextElementSibling;d.querySelectorAll('[data-r]').forEach(e=>e.onchange=()=>{const k=e.dataset.r;i.risk[k]=k==='peakNote'?e.value:num(e.value);persist();render()})});
+  m.querySelectorAll('[data-rm]').forEach(b=>b.onclick=()=>{if(confirm('刪除這個標的？')){S.instruments.splice(Number(b.dataset.rm),1);persist();render()}});
+  m.querySelectorAll('[data-s]').forEach(e=>e.onchange=()=>{S.settings[e.dataset.s]=num(e.value);persist();render()});
+  $('#n_add').onclick=()=>{const c=$('#n_code').value.trim().toUpperCase(),n=$('#n_name').value.trim();if(!c||!n||insOf(c)){alert('請填代號與名稱（代號不能重複）');return}
+    S.instruments.push({code:c,name:n,target:num($('#n_t').value)||0,tol:num($('#n_tol').value)||5,risk:{peak:null,peakNote:'',pauseDD:null,pauseLoss:null,cutDD:null,cutTarget:null}});persist();render()};
+  $('#peakReset').onclick=()=>{const C=compute();S.settings.totalPeak=Math.round(S.cash+S.instruments.reduce((s,i)=>s+(C.hold[i.code]?.shares||0)*priceOf(i.code),0));persist();render()};
+  $('#c_save').onclick=async()=>{conn={repo:$('#c_repo').value.trim(),token:$('#c_token').value.trim()};localStorage.setItem(LS_CONN,JSON.stringify(conn));await pullRemote()};
+  $('#c_off').onclick=()=>{conn={};localStorage.removeItem(LS_CONN);remoteSha=null;setChip('local','本機模式');render()};
+  $('#exp_copy').onclick=()=>{navigator.clipboard.writeText($('#exp').value).then(()=>alert('已複製'))};
+  $('#imp_go').onclick=()=>{try{const j=JSON.parse($('#imp').value);if(!j.v)throw 0;if(!confirm('會取代目前所有資料，確定？'))return;S=merge(j);persist();render()}catch(e){alert('備份格式不正確')}};
+}
+
+/* ========== 啟動 ========== */
+render();
+if(conn.token&&conn.repo)pullRemote();else setChip('local','本機模式');
+</script>
+</body>
+</html>
